@@ -9,7 +9,7 @@ export async function getCurrentUser() {
 export async function requireAuth() {
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/api/auth/signin");
+    redirect("/");
   }
   return user;
 }
