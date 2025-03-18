@@ -40,14 +40,12 @@ const Dashboard = () => {
     flagged: false,
   });
 
-  // Add state for task counts
-  const [taskCounts, setTaskCounts] = useState({
-    today: 0,
-    scheduled: 0,
-    all: 0,
-    flagged: 0,
-    completed: 0,
-  });
+  
+  const [today, setToday] = useState(0);
+  const [scheduled, setScheduled] = useState(0);
+  const [all, setAll] = useState(0);
+  const [flagged, setFlagged] = useState(0);
+  const [completed, setCompleted] = useState(0);
 
   // Add a state variable to track first load
   const [isFirstLoad, setIsFirstLoad] = useState(true);
@@ -70,35 +68,30 @@ const Dashboard = () => {
 
       // Use await for each call to ensure proper error handling
       const todayTasks = await fetchTasksDueToday(userId);
+      setToday(todayTasks.length);
       console.log("Today tasks:", todayTasks.length);
 
       const scheduledTasks = await fetchScheduledTasks(userId);
+      setScheduled(scheduledTasks.length);
       console.log("Scheduled tasks:", scheduledTasks.length);
 
       const flaggedTasks = await fetchFlaggedTasks(userId);
+      setFlagged(flaggedTasks.length);
       console.log("Flagged tasks:", flaggedTasks.length);
 
       const completedTasks = await fetchCompletedTasks(userId);
+      setCompleted(completedTasks.length);
       console.log("Completed tasks:", completedTasks.length);
 
       // For all tasks, get the count directly instead of fetching all data
-      let allTasksCount = 0;
-      if (lists.length > 0) {
-        for (const list of lists) {
-          const listTasks = await fetchUserTodoListTasks(userId, list.id);
-          allTasksCount += listTasks.length;
-        }
-      }
-      console.log("All tasks count:", allTasksCount);
-
-      // Update state with fresh counts
-      setTaskCounts({
-        today: todayTasks.length,
-        scheduled: scheduledTasks.length,
-        all: allTasksCount,
-        flagged: flaggedTasks.length,
-        completed: completedTasks.length,
-      });
+      // let allTasksCount = 0;
+      // if (lists.length > 0) {
+      //   for (const list of lists) {
+      //     const listTasks = await fetchUserTodoListTasks(userId, list.id);
+      //     allTasksCount += listTasks.length;
+      //   }
+      // }
+      // console.log("All tasks count:", allTasksCount);
 
       console.log("Task counts updated successfully");
     } catch (error) {
@@ -224,21 +217,21 @@ const Dashboard = () => {
       await markTaskCompleted(taskId, true);
       console.log("Task marked complete successfully");
 
-      // Refresh the task list to remove the completed task
+      
       const updatedTasks = await fetchUserTodoListTasks(
         userId,
         selectedList.id
       );
       setTask(updatedTasks);
 
-      // Force update counts after task completion
+      
       await updateTaskCounts();
     } catch (error) {
       console.error("Error marking task as complete:", error);
     }
   }
 
-  // Function to handle category clicks and display appropriate tasks
+  
   async function handleCategoryClick(category) {
     try {
       const userId = localStorage.getItem("userId");
@@ -247,7 +240,7 @@ const Dashboard = () => {
         return;
       }
 
-      setSelectedList(null); // Clear selected list when viewing a category
+      setSelectedList(null); 
       setCurrentCategory(category);
 
       let tasks = [];
@@ -312,35 +305,35 @@ const Dashboard = () => {
           {[
             {
               name: "Today",
-              count: taskCounts.today,
+              // count: today,
               icon: <Calendar className="w-5 h-5 text-white" />,
               bgColor: "bg-blue-500",
               category: "today",
             },
             {
               name: "Scheduled",
-              count: taskCounts.scheduled,
+              // count: scheduled,
               icon: <Calendar className="w-5 h-5 text-white" />,
               bgColor: "bg-red-500",
               category: "scheduled",
             },
             {
               name: "All",
-              count: taskCounts.all,
+              // count: 0,
               icon: <Calendar className="w-5 h-5 text-white" />,
               bgColor: "bg-gray-500",
               category: "all",
             },
             {
               name: "Flagged",
-              count: taskCounts.flagged,
+              // count: flagged,
               icon: <Flag className="w-5 h-5 text-white" />,
               bgColor: "bg-yellow-500",
               category: "flagged",
             },
             {
               name: "Completed",
-              count: taskCounts.completed,
+              // count: completed,
               icon: <CheckCircle className="w-5 h-5 text-white" />,
               bgColor: "bg-green-500",
               category: "completed",
@@ -359,7 +352,7 @@ const Dashboard = () => {
                 </div>
                 <p className="mt-2 text-gray-400 text-sm">{item.name}</p>
               </div>
-              <p className="text-white font-bold text-2xl">{item.count}</p>
+              {/* <p className="text-white font-bold text-2xl">{item.count}</p> */}
             </div>
           ))}
         </div>
