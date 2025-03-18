@@ -52,6 +52,10 @@ const Dashboard = () => {
   // Add a state variable to track first load
   const [isFirstLoad, setIsFirstLoad] = useState(true);
 
+  // Add state to track the current category view
+  const [currentCategory, setCurrentCategory] = useState(null);
+  const [categoryTitle, setCategoryTitle] = useState("");
+
   // Simplified updateTaskCounts function - focus on direct state updates
   const updateTaskCounts = async () => {
     console.log("update count function called");
@@ -234,6 +238,60 @@ const Dashboard = () => {
     }
   }
 
+  // Function to handle category clicks and display appropriate tasks
+  async function handleCategoryClick(category) {
+    try {
+      const userId = localStorage.getItem("userId");
+      if (!userId) {
+        console.error("No userId found");
+        return;
+      }
+
+      setSelectedList(null); // Clear selected list when viewing a category
+      setCurrentCategory(category);
+
+      let tasks = [];
+
+      switch (category) {
+        case "today":
+          tasks = await fetchTasksDueToday(userId);
+          setCategoryTitle("Today's Tasks");
+          break;
+        case "scheduled":
+          tasks = await fetchScheduledTasks(userId);
+          setCategoryTitle("Scheduled Tasks");
+          break;
+        case "all":
+          // Fetch all incomplete tasks from all lists
+          const allLists = await fetchUserTodoLists(userId);
+          const allTaskPromises = allLists.map((list) =>
+            fetchUserTodoListTasks(userId, list.id)
+          );
+          const allTasksNested = await Promise.all(allTaskPromises);
+          tasks = allTasksNested.flat(); // Flatten nested array
+          setCategoryTitle("All Tasks");
+          break;
+        case "flagged":
+          tasks = await fetchFlaggedTasks(userId);
+          setCategoryTitle("Flagged Tasks");
+          break;
+        case "completed":
+          tasks = await fetchCompletedTasks(userId);
+          setCategoryTitle("Completed Tasks");
+          break;
+        default:
+          console.error("Unknown category:", category);
+          return;
+      }
+
+      console.log(`Fetched ${tasks.length} tasks for category: ${category}`);
+      setTask(tasks);
+    } catch (error) {
+      console.error(`Error fetching ${category} tasks:`, error);
+      setTask([]);
+    }
+  }
+
   const openListModal = () => setIsListModalOpen(true);
   const closeListModal = () => {
     setIsListModalOpen(false);
@@ -257,35 +315,41 @@ const Dashboard = () => {
               count: taskCounts.today,
               icon: <Calendar className="w-5 h-5 text-white" />,
               bgColor: "bg-blue-500",
+              category: "today",
             },
             {
               name: "Scheduled",
               count: taskCounts.scheduled,
               icon: <Calendar className="w-5 h-5 text-white" />,
               bgColor: "bg-red-500",
+              category: "scheduled",
             },
             {
               name: "All",
               count: taskCounts.all,
               icon: <Calendar className="w-5 h-5 text-white" />,
               bgColor: "bg-gray-500",
+              category: "all",
             },
             {
               name: "Flagged",
               count: taskCounts.flagged,
               icon: <Flag className="w-5 h-5 text-white" />,
               bgColor: "bg-yellow-500",
+              category: "flagged",
             },
             {
               name: "Completed",
               count: taskCounts.completed,
               icon: <CheckCircle className="w-5 h-5 text-white" />,
               bgColor: "bg-green-500",
+              category: "completed",
             },
           ].map((item, index) => (
             <div
               key={index}
-              className="bg-neutral-800 p-4 rounded-lg flex justify-between items-center h-24 w-full"
+              className="bg-neutral-800 p-4 rounded-lg flex justify-between items-center h-24 w-full cursor-pointer hover:bg-neutral-700 transition-colors"
+              onClick={() => handleCategoryClick(item.category)}
             >
               <div className="flex flex-col items-start">
                 <div
@@ -361,12 +425,12 @@ const Dashboard = () => {
                         className="appearance-none w-5 h-5 border-2 border-yellow-500 rounded-full 
                                   checked:bg-yellow-500 checked:border-yellow-500 cursor-pointer"
                         onChange={() => handleTaskCompletion(t.id)}
+                        checked={t.completed || false}
                       />
                       <CheckCircle
-                        className="absolute top-0 left-0 w-5 h-5 text-black pointer-events-none 
-                                 opacity-0 peer-checked:opacity-100"
+                        className="absolute top-0 left-0 w-5 h-5 text-black pointer-events-none"
                         style={{
-                          opacity: 0,
+                          opacity: t.completed ? 1 : 0,
                           pointerEvents: "none",
                         }}
                       />
@@ -407,8 +471,74 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
+        ) : currentCategory ? (
+          <div>
+            <h2 className="text-yellow-500 text-2xl font-bold">
+              {categoryTitle}
+            </h2>
+            <ul className="mt-4 space-y-4">
+              {task && task.length > 0 ? (
+                task.map((t, index) => (
+                  <li
+                    key={index}
+                    data-id={t.id}
+                    className="p-4 bg-neutral-800 rounded-lg flex items-start gap-3 hover:bg-neutral-700 transition-colors cursor-pointer"
+                  >
+                    <div className="relative mt-1">
+                      <input
+                        type="checkbox"
+                        id={`task-${t.id}`}
+                        name="task-selection"
+                        className="appearance-none w-5 h-5 border-2 border-yellow-500 rounded-full 
+                                  checked:bg-yellow-500 checked:border-yellow-500 cursor-pointer"
+                        onChange={() => handleTaskCompletion(t.id)}
+                        checked={t.completed || false}
+                        disabled={currentCategory === "completed"}
+                      />
+                      <CheckCircle
+                        className="absolute top-0 left-0 w-5 h-5 text-black pointer-events-none"
+                        style={{
+                          opacity: t.completed ? 1 : 0,
+                          pointerEvents: "none",
+                        }}
+                      />
+                    </div>
+                    <div className="flex-grow">
+                      <div className="flex justify-between">
+                        <h3 className="text-white font-semibold">{t.title}</h3>
+                        {/* Show list name for tasks in category views */}
+                        <span className="text-xs text-gray-500 bg-neutral-700 px-2 py-1 rounded">
+                          {lists.find((list) => list.id === t.listId)
+                            ?.listName || "Unknown List"}
+                        </span>
+                      </div>
+                      <p className="text-gray-400 text-sm">{t.description}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-gray-400 text-sm">
+                          {t.dueDate
+                            ? new Date(
+                                t.dueDate.seconds * 1000
+                              ).toLocaleDateString()
+                            : "No due date"}
+                        </p>
+                        {t.flagged && (
+                          <Flag className="h-4 w-4 text-yellow-500" />
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                ))
+              ) : (
+                <p className="text-gray-400">
+                  No tasks found in this category.
+                </p>
+              )}
+            </ul>
+          </div>
         ) : (
-          <p className="text-gray-400 text-lg">Select a list to view details</p>
+          <p className="text-gray-400 text-lg">
+            Select a list or category to view tasks
+          </p>
         )}
       </div>
 
