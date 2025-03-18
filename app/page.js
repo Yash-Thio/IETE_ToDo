@@ -262,13 +262,13 @@ export default function LandingPage() {
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
             <div className="p-4 sm:p-6 rounded-lg border border-zinc-800 bg-zinc-900">
               <div className="flex items-center gap-4 mb-4">
-                <Image
+                {/* <Image
                   src="/placeholder.svg?height=100&width=100"
                   alt="User avatar"
                   width={48}
                   height={48}
                   className="rounded-full"
-                />
+                /> */}
                 <div>
                   <h4 className="font-bold">Sarah Johnson</h4>
                   <p className="text-sm text-zinc-400">Product Manager</p>
@@ -283,13 +283,13 @@ export default function LandingPage() {
 
             <div className="p-4 sm:p-6 rounded-lg border border-zinc-800 bg-zinc-900">
               <div className="flex items-center gap-4 mb-4">
-                <Image
+                {/* <Image
                   src="/placeholder.svg?height=100&width=100"
                   alt="User avatar"
                   width={48}
                   height={48}
                   className="rounded-full"
-                />
+                /> */}
                 <div>
                   <h4 className="font-bold">Michael Chen</h4>
                   <p className="text-sm text-zinc-400">Software Developer</p>
@@ -304,13 +304,13 @@ export default function LandingPage() {
 
             <div className="p-4 sm:p-6 rounded-lg border border-zinc-800 bg-zinc-900">
               <div className="flex items-center gap-4 mb-4">
-                <Image
+                {/* <Image
                   src="/placeholder.svg?height=100&width=100"
                   alt="User avatar"
                   width={48}
                   height={48}
                   className="rounded-full"
-                />
+                /> */}
                 <div>
                   <h4 className="font-bold">Emily Rodriguez</h4>
                   <p className="text-sm text-zinc-400">Freelance Designer</p>

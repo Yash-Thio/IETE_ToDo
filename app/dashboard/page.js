@@ -1,47 +1,57 @@
 "use client";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, Flag, CheckCircle, ChevronRight, Plus } from "lucide-react";
+import { Calendar, Flag,FlagIcon, CheckCircle, ChevronRight, Plus, X } from "lucide-react";
 
 const Dashboard = () => {
   const router = useRouter();
   const [lists, setLists] = useState([
     {
       name: "Reminders",
-      count: 10,
+      count: 2,
       bgColor: "bg-purple-500",
       tasks: [
-        { title: "Meeting", description: "Team sync-up at 10 AM", dueDate: "Due: Today" },
-        { title: "Groceries", description: "Buy vegetables and milk", dueDate: "Due: Tomorrow" },
+        { title: "Meeting", description: "Team sync-up at 10 AM", dueDate: "Today" },
+        { title: "Groceries", description: "Buy vegetables and milk", dueDate: "Tomorrow" },
       ],
     },
     {
       name: "Urgent To-Do",
-      count: 4,
+      count: 2,
       bgColor: "bg-orange-500",
       tasks: [
-        { title: "Project Report", description: "Submit the final project report", dueDate: "Due: Today" },
-        { title: "Bank Call", description: "Call the bank for loan inquiry", dueDate: "Due: Tomorrow" },
+        { title: "Project Report", description: "Submit the final project report", dueDate: "Today" },
+        { title: "Bank Call", description: "Call the bank for loan inquiry", dueDate: "Tomorrow" },
       ],
     },
   ]);
 
   const [selectedList, setSelectedList] = useState(null);
-  const [selectedTask, setSelectedTask] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isListModalOpen, setIsListModalOpen] = useState(false);
+  const [newListName, setNewListName] = useState("");
+  const [newTask, setNewTask] = useState({ title: "", description: "", dueDate: "", flagged: false });
 
   const addNewList = () => {
-    const newList = { name: `New List ${lists.length + 1}`, count: 0, bgColor: "bg-blue-500", tasks: [] };
-    setLists([...lists, newList]);
+    if (!newListName.trim()) return;
+    const newList = { name: newListName, count: 0, bgColor: "bg-blue-500", tasks: [] };
+    setLists((prevLists) => [...prevLists, newList]);
+    closeListModal();
   };
 
-  const addTaskToList = (listName, task) => {
+  const addTaskToList = () => {
+    if (!newTask.title.trim() || !selectedList) return;
     setLists((prevLists) =>
       prevLists.map((list) =>
-        list.name === listName
-          ? { ...list, tasks: [...list.tasks, task], count: list.count + 1 }
+        list.name === selectedList.name
+          ? { ...list, tasks: [...list.tasks, newTask], count: list.count + 1 }
           : list
       )
     );
+    setSelectedList((prev) =>
+      prev ? { ...prev, tasks: [...prev.tasks, newTask], count: prev.count + 1 } : null
+    );
+    closeTaskModal();
   };
 
   const handleListClick = (list) => {
@@ -52,11 +62,25 @@ const Dashboard = () => {
     }
   };
 
+  const openListModal = () => setIsListModalOpen(true);
+  const closeListModal = () => {
+    setIsListModalOpen(false);
+    setNewListName("");
+  };
+
+  const openTaskModal = () => setIsModalOpen(true);
+  const closeTaskModal = () => {
+    setIsModalOpen(false);
+    setNewTask({ title: "", description: "", dueDate: "", flagged: false });
+  };
+
   return (
-    <div className="min-h-screen bg-black text-white p-4 flex flex-col lg:flex-row gap-6 font-['SF Pro']">
-      <div className="w-full lg:w-1/3 flex flex-col gap-4 overflow-hidden pb-16">
-        <div className="grid grid-cols-2 gap-4">
-          {[{ name: "Today", count: 5, icon: <Calendar className="w-5 h-5 text-white" />, bgColor: "bg-blue-500" },
+    <div className="min-h-screen bg-black text-white p-4 flex flex-col lg:flex-row gap-6">
+      {/* Sidebar */}
+      <div className="w-full lg:w-1/3 flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-4">
+          {[
+            { name: "Today", count: 5, icon: <Calendar className="w-5 h-5 text-white" />, bgColor: "bg-blue-500" },
             { name: "Scheduled", count: 8, icon: <Calendar className="w-5 h-5 text-white" />, bgColor: "bg-red-500" },
             { name: "All", count: 15, icon: <Calendar className="w-5 h-5 text-white" />, bgColor: "bg-gray-500" },
             { name: "Flagged", count: 3, icon: <Flag className="w-5 h-5 text-white" />, bgColor: "bg-yellow-500" },
@@ -64,7 +88,9 @@ const Dashboard = () => {
           ].map((item, index) => (
             <div key={index} className="bg-neutral-800 p-4 rounded-lg flex justify-between items-center h-24 w-full">
               <div className="flex flex-col items-start">
-                <div className={`w-10 h-10 flex items-center justify-center rounded-full ${item.bgColor}`}>{item.icon}</div>
+                <div className={`w-10 h-10 flex items-center justify-center rounded-full ${item.bgColor}`}>
+                  {item.icon}
+                </div>
                 <p className="mt-2 text-gray-400 text-sm">{item.name}</p>
               </div>
               <p className="text-white font-bold text-2xl">{item.count}</p>
@@ -82,7 +108,7 @@ const Dashboard = () => {
                 onClick={() => handleListClick(list)}
               >
                 <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 flex items-center justify-center rounded-full ${list.bgColor}`}> 
+                  <div className={`w-8 h-8 flex items-center justify-center rounded-full ${list.bgColor}`}>
                     <Calendar className="text-white w-5 h-5" />
                   </div>
                   <p className="text-white font-bold text-sm">{list.name}</p>
@@ -94,7 +120,7 @@ const Dashboard = () => {
               </div>
             ))}
           </div>
-          <button className="mt-4 flex items-center gap-2 text-blue-500 cursor-pointer" onClick={addNewList}>
+          <button className="mt-4 flex items-center gap-2 text-blue-500" onClick={openListModal}>
             <div className="w-8 h-8 flex items-center justify-center bg-blue-500 rounded-full">
               <Plus className="w-5 h-5 text-white" />
             </div>
@@ -103,6 +129,7 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Main Content */}
       <div className="hidden lg:block w-2/3 bg-neutral-900 p-6 rounded-lg relative">
         {selectedList ? (
           <div>
@@ -114,9 +141,7 @@ const Dashboard = () => {
                     type="radio"
                     name="task-selection"
                     className="w-5 h-5 accent-yellow-500 mt-1"
-                    checked={selectedTask === index}
-                    onChange={() => setSelectedTask(index)}
-                  />
+                                     />
                   <div>
                     <h3 className="text-white font-semibold">{task.title}</h3>
                     <p className="text-gray-400 text-sm">{task.description}</p>
@@ -125,20 +150,114 @@ const Dashboard = () => {
                 </li>
               ))}
             </ul>
-            <div 
+            <div
               className="absolute bottom-6 left-6 flex items-center gap-2 text-yellow-500 font-semibold cursor-pointer"
-              onClick={() => addTaskToList(selectedList.name, { title: "New Task", description: "Task details", dueDate: "Due: TBD" })}
+              onClick={() => openTaskModal}
             >
-              <div className="bg-yellow-500 text-black p-3 rounded-full shadow-lg">
+              
+               <div className="absolute bottom-6 left-6 flex items-center gap-2 text-yellow-500" onClick={openTaskModal}>
+              <div className="bg-yellow-500 text-black p-3 rounded-full">
                 <Plus className="w-4 h-4" />
               </div>
-              <span className="text-lg">Add {selectedList.name}</span>
+              <h1>Add Task</h1>
+            </div>
             </div>
           </div>
         ) : (
           <p className="text-gray-400 text-lg">Select a list to view details</p>
         )}
       </div>
+
+
+      {/* Task Modal */}
+      {isModalOpen && (
+  <div className="fixed inset-0 bg-transparent backdrop-blur-lg flex items-center justify-center z-50">
+    <div className="bg-neutral-900 p-6 rounded-lg w-96 shadow-lg relative">
+      <button className="absolute top-2 right-2 text-white" onClick={closeTaskModal}>
+        <X className="w-5 h-5" />
+      </button>
+      <h2 className="text-white text-xl font-bold mb-4">Add Task</h2>
+      
+      <input 
+        type="text" 
+        placeholder="Task Title" 
+        className="w-full p-2 mb-3 bg-neutral-800 text-white rounded-lg border border-gray-600" 
+        value={newTask.title}
+        onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+      />
+      
+      <textarea 
+        placeholder="Task Description" 
+        className="w-full p-2 mb-3 bg-neutral-800 text-white rounded-lg border border-gray-600" 
+        value={newTask.description}
+        onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+      />
+      
+      <div className="flex items-center mb-3">
+        <span className="text-yellow-500 mr-1">
+          <FlagIcon className="w-5 h-5" />
+        </span>
+        
+        <label htmlFor="flagCheckbox" className="text-white font-medium">Flag Task</label>
+        <input 
+          type="checkbox" 
+          id="flagCheckbox" 
+          className="w-4 h-4 mr-2 ml-7" 
+          checked={newTask.flagged || false}
+          onChange={(e) => setNewTask({ ...newTask, flagged: e.target.checked })}
+        />
+      </div>
+      
+      <div className="mb-3">
+        <label className="text-white font-medium block mb-1">Task Deadline</label>
+        <div className="flex items-center">
+          <input 
+            type="date" 
+            className="w-full p-2 bg-neutral-800 text-white rounded-lg border border-gray-600" 
+            value={newTask.dueDate}
+            onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+          />
+        </div>
+      </div>
+      
+      <button 
+        className="w-full p-2 bg-yellow-500 text-white rounded-lg font-bold" 
+        onClick={() => addTaskToList(selectedList.name, newTask)}>
+        Add
+      </button>
+    </div>
+  </div>
+)}
+
+
+
+
+      {/* List Modal */}
+      {isListModalOpen && (
+  <div className="fixed inset-0 bg-transparent backdrop-blur-lg flex items-center justify-center z-50">
+    <div className="bg-neutral-900 p-6 rounded-lg w-96 shadow-lg relative">
+      <button className="absolute top-2 right-2 text-white" onClick={closeListModal}>
+        <X className="w-5 h-5" />
+      </button>
+      <h2 className="text-white text-xl font-bold mb-4">Create New List</h2>
+      
+      <input 
+        type="text" 
+        placeholder="List Name" 
+        className="w-full p-2 mb-3 bg-neutral-800 text-white rounded-lg border border-gray-600" 
+        value={newListName}
+        onChange={(e) => setNewListName(e.target.value)}
+      />
+      
+      <button 
+        className="w-full p-2 bg-blue-500 text-white rounded-lg font-bold"
+        onClick={() => addNewList(newListName)}>
+        Create List
+      </button>
+    </div>
+  </div>
+)}
+
     </div>
   );
 };
