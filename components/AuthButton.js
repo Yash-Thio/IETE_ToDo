@@ -99,8 +99,19 @@ export default function AuthButton() {
     try {
       // Clear user from localStorage
       await saveUserId(null);
-      // Sign out from NextAuth
-      await signOut({ callbackUrl: "/" });
+
+      // Sign out from NextAuth with redirect
+      await signOut({
+        callbackUrl: "/",
+        redirect: true,
+      });
+
+      // Clear any remaining Google OAuth cookies
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
     } catch (error) {
       console.error("Sign out error:", error);
     }
