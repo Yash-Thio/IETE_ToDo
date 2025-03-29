@@ -40,7 +40,6 @@ const Dashboard = () => {
     flagged: false,
   });
 
-  
   const [today, setToday] = useState(0);
   const [scheduled, setScheduled] = useState(0);
   const [all, setAll] = useState(0);
@@ -54,7 +53,6 @@ const Dashboard = () => {
   const [currentCategory, setCurrentCategory] = useState(null);
   const [categoryTitle, setCategoryTitle] = useState("");
 
-  // Simplified updateTaskCounts function - focus on direct state updates
   const updateTaskCounts = async () => {
     console.log("update count function called");
     try {
@@ -66,34 +64,51 @@ const Dashboard = () => {
 
       console.log("Updating task counts with userId:", userId);
 
-      // Use await for each call to ensure proper error handling
-      const todayTasks = await fetchTasksDueToday(userId);
+      // Fetch all tasks first to avoid duplicate counting
+      const allLists = await fetchUserTodoLists(userId);
+      const allTaskPromises = allLists.map(
+        (list) => fetchUserTodoListTasks(userId, list.id, true) // Include completed tasks
+      );
+      const allTasksNested = await Promise.all(allTaskPromises);
+      const allTasks = allTasksNested.flat();
+
+      // Get today's date at beginning and end
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // Calculate counts
+      const todayTasks = allTasks.filter((task) => {
+        if (!task.dueDate) return false;
+        const taskDate = task.dueDate.toDate();
+        return taskDate >= today && taskDate < tomorrow;
+      });
+
+      const scheduledTasks = allTasks.filter((task) => {
+        if (!task.dueDate || task.completed) return false;
+        const taskDate = task.dueDate.toDate();
+        return taskDate >= tomorrow;
+      });
+
+      const flaggedTasks = allTasks.filter((task) => task.flagged);
+      const completedTasks = allTasks.filter((task) => task.completed);
+      const incompleteTasks = allTasks.filter((task) => !task.completed);
+
+      // Update state
       setToday(todayTasks.length);
-      console.log("Today tasks:", todayTasks.length);
-
-      const scheduledTasks = await fetchScheduledTasks(userId);
       setScheduled(scheduledTasks.length);
-      console.log("Scheduled tasks:", scheduledTasks.length);
-
-      const flaggedTasks = await fetchFlaggedTasks(userId);
+      setAll(incompleteTasks.length);
       setFlagged(flaggedTasks.length);
-      console.log("Flagged tasks:", flaggedTasks.length);
-
-      const completedTasks = await fetchCompletedTasks(userId);
       setCompleted(completedTasks.length);
-      console.log("Completed tasks:", completedTasks.length);
 
-      // For all tasks, get the count directly instead of fetching all data
-      // let allTasksCount = 0;
-      // if (lists.length > 0) {
-      //   for (const list of lists) {
-      //     const listTasks = await fetchUserTodoListTasks(userId, list.id);
-      //     allTasksCount += listTasks.length;
-      //   }
-      // }
-      // console.log("All tasks count:", allTasksCount);
-
-      console.log("Task counts updated successfully");
+      console.log("Task counts updated successfully:", {
+        today: todayTasks.length,
+        scheduled: scheduledTasks.length,
+        all: incompleteTasks.length,
+        flagged: flaggedTasks.length,
+        completed: completedTasks.length,
+      });
     } catch (error) {
       console.error("Error updating task counts:", error);
     }
@@ -116,20 +131,18 @@ const Dashboard = () => {
         console.log("Fetched lists:", todoLists);
         setLists(todoLists);
 
-        // Wait a moment before updating counts to ensure lists are set in state
-        setTimeout(() => {
-          updateTaskCounts();
-          setIsFirstLoad(false);
-        }, 500);
+        // Update counts immediately after lists are fetched
+        await updateTaskCounts();
+        setIsFirstLoad(false);
       } catch (error) {
         console.error("Error initializing dashboard:", error);
       }
     };
 
     initialize();
-  }, []);
+  }, []); // Empty dependency array since this should only run once on mount
 
-  // Add a simple effect to update counts when tasks or lists change
+  // Update counts when tasks or lists change
   useEffect(() => {
     if (!isFirstLoad) {
       console.log("Updating counts due to task or list change");
@@ -217,21 +230,25 @@ const Dashboard = () => {
       await markTaskCompleted(taskId, true);
       console.log("Task marked complete successfully");
 
-      
-      const updatedTasks = await fetchUserTodoListTasks(
-        userId,
-        selectedList.id
-      );
-      setTask(updatedTasks);
+      // If we're viewing a list, update that list's tasks
+      if (selectedList) {
+        const updatedTasks = await fetchUserTodoListTasks(
+          userId,
+          selectedList.id
+        );
+        setTask(updatedTasks);
+      } else if (currentCategory) {
+        // If we're viewing a category, refresh the category tasks
+        await handleCategoryClick(currentCategory);
+      }
 
-      
+      // Update counts regardless of view
       await updateTaskCounts();
     } catch (error) {
       console.error("Error marking task as complete:", error);
     }
   }
 
-  
   async function handleCategoryClick(category) {
     try {
       const userId = localStorage.getItem("userId");
@@ -240,7 +257,7 @@ const Dashboard = () => {
         return;
       }
 
-      setSelectedList(null); 
+      setSelectedList(null);
       setCurrentCategory(category);
 
       let tasks = [];
@@ -298,97 +315,107 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 flex flex-col lg:flex-row gap-6">
+    <div className="min-h-screen bg-black text-white p-2 sm:p-4 flex flex-col lg:flex-row gap-4 lg:gap-6">
       {/* Sidebar */}
       <div className="w-full lg:w-1/3 flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-2 sm:gap-4">
           {[
             {
               name: "Today",
-              // count: today,
-              icon: <Calendar className="w-5 h-5 text-white" />,
+              count: today,
+              icon: <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-white" />,
               bgColor: "bg-blue-500",
               category: "today",
             },
             {
               name: "Scheduled",
-              // count: scheduled,
-              icon: <Calendar className="w-5 h-5 text-white" />,
+              count: scheduled,
+              icon: <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-white" />,
               bgColor: "bg-red-500",
               category: "scheduled",
             },
             {
               name: "All",
-              // count: 0,
-              icon: <Calendar className="w-5 h-5 text-white" />,
+              count: all,
+              icon: <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-white" />,
               bgColor: "bg-gray-500",
               category: "all",
             },
             {
               name: "Flagged",
-              // count: flagged,
-              icon: <Flag className="w-5 h-5 text-white" />,
+              count: flagged,
+              icon: <Flag className="w-4 h-4 sm:w-5 sm:h-5 text-white" />,
               bgColor: "bg-yellow-500",
               category: "flagged",
             },
             {
               name: "Completed",
-              // count: completed,
-              icon: <CheckCircle className="w-5 h-5 text-white" />,
+              count: completed,
+              icon: (
+                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              ),
               bgColor: "bg-green-500",
               category: "completed",
             },
           ].map((item, index) => (
             <div
               key={index}
-              className="bg-neutral-800 p-4 rounded-lg flex justify-between items-center h-24 w-full cursor-pointer hover:bg-neutral-700 transition-colors"
+              className="bg-neutral-800 p-3 sm:p-4 rounded-lg flex justify-between items-center h-20 sm:h-24 w-full cursor-pointer hover:bg-neutral-700 transition-colors"
               onClick={() => handleCategoryClick(item.category)}
             >
               <div className="flex flex-col items-start">
                 <div
-                  className={`w-10 h-10 flex items-center justify-center rounded-full ${item.bgColor}`}
+                  className={`w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-full ${item.bgColor}`}
                 >
                   {item.icon}
                 </div>
-                <p className="mt-2 text-gray-400 text-sm">{item.name}</p>
+                <p className="mt-1 sm:mt-2 text-gray-400 text-xs sm:text-sm">
+                  {item.name}
+                </p>
               </div>
-              {/* <p className="text-white font-bold text-2xl">{item.count}</p> */}
+              <p className="text-white font-bold text-lg sm:text-2xl">
+                {item.count}
+              </p>
             </div>
           ))}
         </div>
 
         <div>
-          <h2 className="text-gray-400 text-md font-semibold mb-3">My Lists</h2>
-          <div className="space-y-3">
+          <h2 className="text-gray-400 text-sm sm:text-md font-semibold mb-2 sm:mb-3">
+            My Lists
+          </h2>
+          <div className="space-y-2 sm:space-y-3">
             {lists.map((list, index) => (
               <div
                 key={index}
-                className="bg-neutral-800 p-3 rounded-lg flex items-center justify-between cursor-pointer"
+                className="bg-neutral-800 p-2 sm:p-3 rounded-lg flex items-center justify-between cursor-pointer"
                 onClick={() => handleListClick(list)}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   <div
-                    className={`w-8 h-8 flex items-center justify-center rounded-full ${list.bgColor}`}
+                    className={`w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center rounded-full ${list.bgColor}`}
                   >
-                    <Calendar className="text-white w-5 h-5" />
+                    <Calendar className="text-white w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
-                  <p className="text-white font-bold text-sm">
+                  <p className="text-white font-bold text-xs sm:text-sm">
                     {list.listName}
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <p className="text-gray-400 text-sm">{list.count}</p>
-                  <ChevronRight className="text-gray-500" />
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <p className="text-gray-400 text-xs sm:text-sm">
+                    {list.count}
+                  </p>
+                  <ChevronRight className="text-gray-500 w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
               </div>
             ))}
           </div>
           <button
-            className="mt-4 flex items-center gap-2 text-blue-500"
+            className="mt-3 sm:mt-4 flex items-center gap-2 text-blue-500 text-sm sm:text-base"
             onClick={openListModal}
           >
-            <div className="w-8 h-8 flex items-center justify-center bg-blue-500 rounded-full">
-              <Plus className="w-5 h-5 text-white" />
+            <div className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center bg-blue-500 rounded-full">
+              <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             Add List
           </button>
@@ -396,32 +423,32 @@ const Dashboard = () => {
       </div>
 
       {/* Main Content */}
-      <div className="hidden lg:block w-2/3 bg-neutral-900 p-6 rounded-lg relative">
+      <div className="w-full lg:w-2/3 bg-neutral-900 p-3 sm:p-6 rounded-lg relative">
         {selectedList ? (
           <div>
-            <h2 className="text-yellow-500 text-2xl font-bold">
+            <h2 className="text-yellow-500 text-xl sm:text-2xl font-bold">
               {selectedList.listName}
             </h2>
-            <ul className="mt-4 space-y-4">
+            <ul className="mt-3 sm:mt-4 space-y-2 sm:space-y-4">
               {task && task.length > 0 ? (
                 task.map((t, index) => (
                   <li
                     key={index}
                     data-id={t.id}
-                    className="p-4 bg-neutral-800 rounded-lg flex items-start gap-3 hover:bg-neutral-700 transition-colors cursor-pointer"
+                    className="p-3 sm:p-4 bg-neutral-800 rounded-lg flex items-start gap-2 sm:gap-3 hover:bg-neutral-700 transition-colors cursor-pointer"
                   >
                     <div className="relative mt-1">
                       <input
                         type="checkbox"
                         id={`task-${t.id}`}
                         name="task-selection"
-                        className="appearance-none w-5 h-5 border-2 border-yellow-500 rounded-full 
+                        className="appearance-none w-4 h-4 sm:w-5 sm:h-5 border-2 border-yellow-500 rounded-full 
                                   checked:bg-yellow-500 checked:border-yellow-500 cursor-pointer"
                         onChange={() => handleTaskCompletion(t.id)}
                         checked={t.completed || false}
                       />
                       <CheckCircle
-                        className="absolute top-0 left-0 w-5 h-5 text-black pointer-events-none"
+                        className="absolute top-0 left-0 w-4 h-4 sm:w-5 sm:h-5 text-black pointer-events-none"
                         style={{
                           opacity: t.completed ? 1 : 0,
                           pointerEvents: "none",
@@ -429,10 +456,14 @@ const Dashboard = () => {
                       />
                     </div>
                     <div>
-                      <h3 className="text-white font-semibold">{t.title}</h3>
-                      <p className="text-gray-400 text-sm">{t.description}</p>
+                      <h3 className="text-white font-semibold text-sm sm:text-base">
+                        {t.title}
+                      </h3>
+                      <p className="text-gray-400 text-xs sm:text-sm">
+                        {t.description}
+                      </p>
                       <div className="flex items-center gap-2 mt-1">
-                        <p className="text-gray-400 text-sm">
+                        <p className="text-gray-400 text-xs sm:text-sm">
                           {t.dueDate
                             ? new Date(
                                 t.dueDate.seconds * 1000
@@ -440,25 +471,25 @@ const Dashboard = () => {
                             : "No due date"}
                         </p>
                         {t.flagged && (
-                          <Flag className="h-4 w-4 text-yellow-500" />
+                          <Flag className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500" />
                         )}
                       </div>
                     </div>
                   </li>
                 ))
               ) : (
-                <p className="text-gray-400">
+                <p className="text-gray-400 text-sm sm:text-base">
                   No tasks in this list. Add your first task!
                 </p>
               )}
             </ul>
-            <div className="absolute bottom-6 left-6">
+            <div className="absolute bottom-4 sm:bottom-6 left-4 sm:left-6">
               <div
-                className="flex items-center gap-2 text-yellow-500 cursor-pointer"
+                className="flex items-center gap-2 text-yellow-500 cursor-pointer text-sm sm:text-base"
                 onClick={openTaskModal}
               >
-                <div className="bg-yellow-500 text-black p-3 rounded-full">
-                  <Plus className="w-4 h-4" />
+                <div className="bg-yellow-500 text-black p-2 sm:p-3 rounded-full">
+                  <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
                 </div>
                 <h1>Add Task</h1>
               </div>
@@ -466,30 +497,30 @@ const Dashboard = () => {
           </div>
         ) : currentCategory ? (
           <div>
-            <h2 className="text-yellow-500 text-2xl font-bold">
+            <h2 className="text-yellow-500 text-xl sm:text-2xl font-bold">
               {categoryTitle}
             </h2>
-            <ul className="mt-4 space-y-4">
+            <ul className="mt-3 sm:mt-4 space-y-2 sm:space-y-4">
               {task && task.length > 0 ? (
                 task.map((t, index) => (
                   <li
                     key={index}
                     data-id={t.id}
-                    className="p-4 bg-neutral-800 rounded-lg flex items-start gap-3 hover:bg-neutral-700 transition-colors cursor-pointer"
+                    className="p-3 sm:p-4 bg-neutral-800 rounded-lg flex items-start gap-2 sm:gap-3 hover:bg-neutral-700 transition-colors cursor-pointer"
                   >
                     <div className="relative mt-1">
                       <input
                         type="checkbox"
                         id={`task-${t.id}`}
                         name="task-selection"
-                        className="appearance-none w-5 h-5 border-2 border-yellow-500 rounded-full 
+                        className="appearance-none w-4 h-4 sm:w-5 sm:h-5 border-2 border-yellow-500 rounded-full 
                                   checked:bg-yellow-500 checked:border-yellow-500 cursor-pointer"
                         onChange={() => handleTaskCompletion(t.id)}
                         checked={t.completed || false}
                         disabled={currentCategory === "completed"}
                       />
                       <CheckCircle
-                        className="absolute top-0 left-0 w-5 h-5 text-black pointer-events-none"
+                        className="absolute top-0 left-0 w-4 h-4 sm:w-5 sm:h-5 text-black pointer-events-none"
                         style={{
                           opacity: t.completed ? 1 : 0,
                           pointerEvents: "none",
@@ -497,17 +528,20 @@ const Dashboard = () => {
                       />
                     </div>
                     <div className="flex-grow">
-                      <div className="flex justify-between">
-                        <h3 className="text-white font-semibold">{t.title}</h3>
-                        {/* Show list name for tasks in category views */}
-                        <span className="text-xs text-gray-500 bg-neutral-700 px-2 py-1 rounded">
+                      <div className="flex justify-between items-start">
+                        <h3 className="text-white font-semibold text-sm sm:text-base">
+                          {t.title}
+                        </h3>
+                        <span className="text-xs text-gray-500 bg-neutral-700 px-2 py-1 rounded ml-2">
                           {lists.find((list) => list.id === t.listId)
                             ?.listName || "Unknown List"}
                         </span>
                       </div>
-                      <p className="text-gray-400 text-sm">{t.description}</p>
+                      <p className="text-gray-400 text-xs sm:text-sm">
+                        {t.description}
+                      </p>
                       <div className="flex items-center gap-2 mt-1">
-                        <p className="text-gray-400 text-sm">
+                        <p className="text-gray-400 text-xs sm:text-sm">
                           {t.dueDate
                             ? new Date(
                                 t.dueDate.seconds * 1000
@@ -515,21 +549,21 @@ const Dashboard = () => {
                             : "No due date"}
                         </p>
                         {t.flagged && (
-                          <Flag className="h-4 w-4 text-yellow-500" />
+                          <Flag className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500" />
                         )}
                       </div>
                     </div>
                   </li>
                 ))
               ) : (
-                <p className="text-gray-400">
+                <p className="text-gray-400 text-sm sm:text-base">
                   No tasks found in this category.
                 </p>
               )}
             </ul>
           </div>
         ) : (
-          <p className="text-gray-400 text-lg">
+          <p className="text-gray-400 text-sm sm:text-base">
             Select a list or category to view tasks
           </p>
         )}
@@ -537,20 +571,22 @@ const Dashboard = () => {
 
       {/* Task Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-transparent backdrop-blur-lg flex items-center justify-center z-50">
-          <div className="bg-neutral-900 p-6 rounded-lg w-96 shadow-lg relative">
+        <div className="fixed inset-0 bg-transparent backdrop-blur-lg flex items-center justify-center z-50 p-4">
+          <div className="bg-neutral-900 p-4 sm:p-6 rounded-lg w-full max-w-sm sm:max-w-md shadow-lg relative">
             <button
               className="absolute top-2 right-2 text-white"
               onClick={closeTaskModal}
             >
               <X className="w-5 h-5" />
             </button>
-            <h2 className="text-white text-xl font-bold mb-4">Add Task</h2>
+            <h2 className="text-white text-lg sm:text-xl font-bold mb-4">
+              Add Task
+            </h2>
 
             <input
               type="text"
               placeholder="Task Title"
-              className="w-full p-2 mb-3 bg-neutral-800 text-white rounded-lg border border-gray-600"
+              className="w-full p-2 mb-3 bg-neutral-800 text-white rounded-lg border border-gray-600 text-sm sm:text-base"
               value={newTask.title}
               onChange={(e) =>
                 setNewTask({ ...newTask, title: e.target.value })
@@ -559,7 +595,7 @@ const Dashboard = () => {
 
             <textarea
               placeholder="Task Description"
-              className="w-full p-2 mb-3 bg-neutral-800 text-white rounded-lg border border-gray-600"
+              className="w-full p-2 mb-3 bg-neutral-800 text-white rounded-lg border border-gray-600 text-sm sm:text-base"
               value={newTask.description}
               onChange={(e) =>
                 setNewTask({ ...newTask, description: e.target.value })
@@ -568,10 +604,13 @@ const Dashboard = () => {
 
             <div className="flex items-center mb-3">
               <span className="text-yellow-500 mr-1">
-                <FlagIcon className="w-5 h-5" />
+                <FlagIcon className="w-4 h-4 sm:w-5 sm:h-5" />
               </span>
 
-              <label htmlFor="flagCheckbox" className="text-white font-medium">
+              <label
+                htmlFor="flagCheckbox"
+                className="text-white font-medium text-sm sm:text-base"
+              >
                 Flag Task
               </label>
               <input
@@ -586,13 +625,13 @@ const Dashboard = () => {
             </div>
 
             <div className="mb-3">
-              <label className="text-white font-medium block mb-1">
+              <label className="text-white font-medium block mb-1 text-sm sm:text-base">
                 Task Deadline
               </label>
               <div className="flex items-center">
                 <input
                   type="date"
-                  className="w-full p-2 bg-neutral-800 text-white rounded-lg border border-gray-600"
+                  className="w-full p-2 bg-neutral-800 text-white rounded-lg border border-gray-600 text-sm sm:text-base"
                   value={newTask.dueDate}
                   onChange={(e) =>
                     setNewTask({ ...newTask, dueDate: e.target.value })
@@ -602,7 +641,7 @@ const Dashboard = () => {
             </div>
 
             <button
-              className="w-full p-2 bg-yellow-500 text-white rounded-lg font-bold"
+              className="w-full p-2 bg-yellow-500 text-white rounded-lg font-bold text-sm sm:text-base"
               onClick={createTaskHandler}
             >
               Add
@@ -613,28 +652,28 @@ const Dashboard = () => {
 
       {/* List Modal */}
       {isListModalOpen && (
-        <div className="fixed inset-0 bg-transparent backdrop-blur-lg flex items-center justify-center z-50">
-          <div className="bg-neutral-900 p-6 rounded-lg w-96 shadow-lg relative">
+        <div className="fixed inset-0 bg-transparent backdrop-blur-lg flex items-center justify-center z-50 p-4">
+          <div className="bg-neutral-900 p-4 sm:p-6 rounded-lg w-full max-w-sm sm:max-w-md shadow-lg relative">
             <button
               className="absolute top-2 right-2 text-white"
               onClick={closeListModal}
             >
               <X className="w-5 h-5" />
             </button>
-            <h2 className="text-white text-xl font-bold mb-4">
+            <h2 className="text-white text-lg sm:text-xl font-bold mb-4">
               Create New List
             </h2>
 
             <input
               type="text"
               placeholder="List Name"
-              className="w-full p-2 mb-3 bg-neutral-800 text-white rounded-lg border border-gray-600"
+              className="w-full p-2 mb-3 bg-neutral-800 text-white rounded-lg border border-gray-600 text-sm sm:text-base"
               value={newListName}
               onChange={(e) => setNewListName(e.target.value)}
             />
 
             <button
-              className="w-full p-2 bg-blue-500 text-white rounded-lg font-bold"
+              className="w-full p-2 bg-blue-500 text-white rounded-lg font-bold text-sm sm:text-base"
               onClick={() => createListHandler(newListName)}
             >
               Create List
